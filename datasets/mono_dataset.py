@@ -7,13 +7,12 @@
 from __future__ import absolute_import, division, print_function
 
 import os
-import random
+#import skimage.transform
 import numpy as np
-import copy
-from PIL import Image  # using pillow-simd for increased speed
+import PIL.Image as pil
 
 import torch
-import torch.utils.data as data
+from torch.utils.data import Dataset
 from torchvision import transforms
 
 
@@ -25,7 +24,7 @@ def pil_loader(path):
             return img.convert('RGB')
 
 
-class MonoDataset(data.Dataset):
+class MonoDataset(Dataset):
     """Superclass for monocular dataloaders
 
     Args:
@@ -54,8 +53,7 @@ class MonoDataset(data.Dataset):
         self.height = height
         self.width = width
         self.num_scales = num_scales
-        self.interp = Image.ANTIALIAS
-
+        self.interp = pil.LANCZOS
         self.frame_idxs = frame_idxs
 
         self.is_train = is_train
@@ -137,8 +135,8 @@ class MonoDataset(data.Dataset):
         """
         inputs = {}
 
-        do_color_aug = self.is_train and random.random() > 0.5
-        do_flip = self.is_train and random.random() > 0.5
+        do_color_aug = self.is_train and np.random.random() > 0.5
+        do_flip = self.is_train and np.random.random() > 0.5
 
         line = self.filenames[index].split()
         folder = line[0]

@@ -52,7 +52,15 @@ def resnet_multiimage_input(num_layers, pretrained=False, num_input_images=1):
     model = ResNetMultiImageInput(block_type, blocks, num_input_images=num_input_images)
 
     if pretrained:
-        loaded = model_zoo.load_url(models.resnet.model_urls['resnet{}'.format(num_layers)])
+        # Use the new weights API for PyTorch compatibility
+        if num_layers == 18:
+            pretrained_model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
+        elif num_layers == 50:
+            pretrained_model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
+        else:
+            raise ValueError(f"Pretrained weights not available for ResNet{num_layers}")
+        
+        loaded = pretrained_model.state_dict()
         loaded['conv1.weight'] = torch.cat(
             [loaded['conv1.weight']] * num_input_images, 1) / num_input_images
         model.load_state_dict(loaded)
@@ -79,7 +87,21 @@ class ResnetEncoder(nn.Module):
         if num_input_images > 1:
             self.encoder = resnet_multiimage_input(num_layers, pretrained, num_input_images)
         else:
-            self.encoder = resnets[num_layers](pretrained)
+            if pretrained:
+                if num_layers == 18:
+                    self.encoder = resnets[num_layers](weights=models.ResNet18_Weights.IMAGENET1K_V1)
+                elif num_layers == 34:
+                    self.encoder = resnets[num_layers](weights=models.ResNet34_Weights.IMAGENET1K_V1)
+                elif num_layers == 50:
+                    self.encoder = resnets[num_layers](weights=models.ResNet50_Weights.IMAGENET1K_V1)
+                elif num_layers == 101:
+                    self.encoder = resnets[num_layers](weights=models.ResNet101_Weights.IMAGENET1K_V1)
+                elif num_layers == 152:
+                    self.encoder = resnets[num_layers](weights=models.ResNet152_Weights.IMAGENET1K_V1)
+                else:
+                    self.encoder = resnets[num_layers](weights=None)
+            else:
+                self.encoder = resnets[num_layers](weights=None)
 
         if num_layers > 34:
             self.num_ch_enc[1:] *= 4

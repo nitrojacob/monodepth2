@@ -11,7 +11,6 @@ import skimage.transform
 import numpy as np
 import PIL.Image as pil
 
-from kitti_utils import generate_depth_map
 from .mono_dataset import MonoDataset
 
 
@@ -27,9 +26,9 @@ class KITTIDataset(MonoDataset):
         # If your principal point is far from the center you might need to disable the horizontal
         # flip augmentation.
         self.K = np.array([[0.58, 0, 0.5, 0],
-                           [0, 1.92, 0.5, 0],
-                           [0, 0, 1, 0],
-                           [0, 0, 0, 1]], dtype=np.float32)
+                          [0, 1.92, 0.5, 0],
+                          [0, 0, 1, 0],
+                          [0, 0, 0, 1]], dtype=np.float32)
 
         self.full_res_shape = (1242, 375)
         self.side_map = {"2": 2, "3": 3, "l": 2, "r": 3}
@@ -100,6 +99,12 @@ class KITTIOdomDataset(KITTIDataset):
             f_str)
         return image_path
 
+    def check_depth(self):
+        return False
+
+    def get_depth(self, folder, frame_index, side, do_flip):
+        return None
+
 
 class KITTIDepthDataset(KITTIDataset):
     """KITTI dataset which uses the updated ground truth depth maps
@@ -116,15 +121,28 @@ class KITTIDepthDataset(KITTIDataset):
             f_str)
         return image_path
 
+    def check_depth(self):
+        line = self.filenames[0].split()
+        scene_name = line[0]
+        frame_index = int(line[1])
+        side = line[2]
+
+        depth_filename = os.path.join(
+            self.data_path,
+            scene_name,
+            "proj_depth/groundtruth/image_0{}".format(self.side_map[side]),
+            "{:010d}.png".format(int(frame_index)))
+
+        return os.path.isfile(depth_filename)
+
     def get_depth(self, folder, frame_index, side, do_flip):
-        f_str = "{:010d}.png".format(frame_index)
-        depth_path = os.path.join(
+        depth_filename = os.path.join(
             self.data_path,
             folder,
             "proj_depth/groundtruth/image_0{}".format(self.side_map[side]),
-            f_str)
+            "{:010d}.png".format(int(frame_index)))
 
-        depth_gt = pil.open(depth_path)
+        depth_gt = pil.open(depth_filename)
         depth_gt = depth_gt.resize(self.full_res_shape, pil.NEAREST)
         depth_gt = np.array(depth_gt).astype(np.float32) / 256
 
@@ -132,3 +150,69 @@ class KITTIDepthDataset(KITTIDataset):
             depth_gt = np.fliplr(depth_gt)
 
         return depth_gt
+
+
+def generate_depth_map(calib_dir, velo_filename, cam):
+    """Generate a depth map from velodyne data
+    """
+    # Load point cloud
+    scan = np.fromfile(velo_filename, dtype=np.float32)
+    scan = scan.reshape((-1, 4))
+    points = scan[:, 0:3]  # extract xyz
+
+    # Load calibration files
+    cam2cam = read_calib_file(os.path.join(calib_dir, 'calib_cam_to_cam.txt'))
+    velo2cam = read_calib_file(os.path.join(calib_dir, 'calib_velo_to_cam.txt'))
+    velo2cam = np.hstack((velo2cam['R'].reshape(3, 3), velo2cam['T'][..., np.newaxis]))
+    velo2cam = np.vstack((velo2cam, np.array([0, 0, 0, 1.0])))
+
+    # Compute projection matrix
+    R_cam2rect = np.eye(4)
+    R_cam2rect[:3, :3] = cam2cam['R_rect_00'].reshape(3, 3)
+
+    P_rect = cam2cam['P_rect_0' + str(cam)].reshape(3, 4)
+    P_velo2im = np.dot(np.dot(P_rect, R_cam2rect), velo2cam)
+
+    # Apply transformation
+    velo = np.insert(points, 3, 1, axis=1).T
+    velo = np.delete(velo, np.where(velo[0, :] < 0), axis=1)
+    cam = np.dot(P_velo2im, velo)
+    cam[:2] /= cam[2, :]
+
+    # Filter points in image bounds and with positive depth
+    im_shape = (370, 1224)
+    inds = np.where((cam[0] >= 0) &
+                    (cam[1] >= 0) &
+                    (cam[0] < im_shape[1]) &
+                    (cam[1] < im_shape[0]) &
+                    (cam[2] > 0))[0]
+
+    # Create depth map
+    depth = np.zeros(im_shape)
+    depth[cam[1, inds].astype(int), cam[0, inds].astype(int)] = cam[2, inds]
+
+    return depth
+
+
+def read_calib_file(path):
+    """Read KITTI calibration file
+    """
+    float_chars = set("0123456789.e+- ")
+    data = {}
+
+    with open(path, 'r') as f:
+        for line in f.readlines():
+            line = line.rstrip()
+            if len(line) == 0: continue
+            key, value = line.split(':', 1)
+            value = value.strip()
+            data[key] = value
+            if float_chars.issuperset(value):
+                # try to cast to float array
+                try:
+                    data[key] = np.array([float(x) for x in value.split(' ')])
+                except ValueError:
+                    # casting error: data[key] already eq. value, so pass
+                    pass
+
+    return data

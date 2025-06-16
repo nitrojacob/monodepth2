@@ -16,14 +16,13 @@ from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 
 import json
+import os
 
 from utils import *
-from kitti_utils import *
 from layers import *
 
 import datasets
 import networks
-from IPython import embed
 
 
 class Trainer:
@@ -112,7 +111,9 @@ class Trainer:
 
         # data
         datasets_dict = {"kitti": datasets.KITTIRAWDataset,
-                         "kitti_odom": datasets.KITTIOdomDataset}
+                        "kitti_odom": datasets.KITTIOdomDataset,
+                        "kitti_depth": datasets.KITTIDepthDataset,
+                        "cityscapes": datasets.CityscapesDataset}
         self.dataset = datasets_dict[self.opt.dataset]
 
         fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files.txt")
@@ -384,7 +385,7 @@ class Trainer:
                 outputs[("color", frame_id, scale)] = F.grid_sample(
                     inputs[("color", frame_id, source_scale)],
                     outputs[("sample", frame_id, scale)],
-                    padding_mode="border")
+                    padding_mode="border", align_corners=True)
 
                 if not self.opt.disable_automasking:
                     outputs[("color_identity", frame_id, scale)] = \
@@ -615,7 +616,7 @@ class Trainer:
             print("Loading {} weights...".format(n))
             path = os.path.join(self.opt.load_weights_folder, "{}.pth".format(n))
             model_dict = self.models[n].state_dict()
-            pretrained_dict = torch.load(path)
+            pretrained_dict = torch.load(path, map_location=self.device)
             pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
             model_dict.update(pretrained_dict)
             self.models[n].load_state_dict(model_dict)
@@ -624,7 +625,7 @@ class Trainer:
         optimizer_load_path = os.path.join(self.opt.load_weights_folder, "adam.pth")
         if os.path.isfile(optimizer_load_path):
             print("Loading Adam weights")
-            optimizer_dict = torch.load(optimizer_load_path)
+            optimizer_dict = torch.load(optimizer_load_path, map_location=self.device)
             self.model_optimizer.load_state_dict(optimizer_dict)
         else:
             print("Cannot find Adam weights so Adam is randomly initialized")
