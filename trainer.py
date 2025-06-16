@@ -168,6 +168,18 @@ class Trainer:
 
         self.save_opts()
 
+    def __del__(self):
+        """Clean up resources to avoid multiprocessing warnings"""
+        try:
+            if hasattr(self, 'train_loader') and hasattr(self.train_loader, '_iterator'):
+                if self.train_loader._iterator is not None:
+                    self.train_loader._iterator._shutdown_workers()
+            if hasattr(self, 'val_loader') and hasattr(self.val_loader, '_iterator'):
+                if self.val_loader._iterator is not None:
+                    self.val_loader._iterator._shutdown_workers()
+        except:
+            pass  # Ignore cleanup errors
+
     def set_train(self):
         """Convert all models to training mode
         """
