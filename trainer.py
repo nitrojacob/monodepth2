@@ -51,7 +51,7 @@ class Trainer:
             self.opt.frame_ids.append("s")
 
         self.models["encoder"] = networks.ResnetEncoder(
-            self.opt.num_layers, self.opt.weights_init == "pretrained")
+            self.opt.num_layers, self.opt.weights_init == "pretrained", num_input_images=2) #Utilize motion parallax for depth estimation
         self.models["encoder"].to(self.device)
         self.parameters_to_train += list(self.models["encoder"].parameters())
 
