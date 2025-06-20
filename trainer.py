@@ -258,7 +258,7 @@ class Trainer:
             outputs = self.models["depth"](features[0])
         else:
             # Otherwise, we only feed the image with frame_id 0 through the depth encoder
-            all_color_aug = torch.cat([inputs[("color_aug", i, 0)] for i in [0, -1]])   #Concatenate two adjacent frames into a six channel image to utilize motion parallax
+            all_color_aug = torch.cat([inputs[("color_aug", i, 0)] for i in [0, -1]], dim=1)   #Concatenate two adjacent frames into a six channel image to utilize motion parallax
             features = self.models["encoder"](all_color_aug)
             outputs = self.models["depth"](features)
 
