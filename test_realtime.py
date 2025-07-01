@@ -42,6 +42,7 @@ def parse_args():
                             "mono+stereo_no_pt_640x192",
                             "mono_1024x320",
                             "stereo_1024x320",
+                            "baseline_mono_640x192",
                             "mono+stereo_1024x320"])
     parser.add_argument('--ext', type=str,
                         help='image extension to search for in folder', default="jpg")
@@ -71,7 +72,7 @@ def test_simple(args):
         print("Warning: The --pred_metric_depth flag only makes sense for stereo-trained KITTI "
               "models. For mono-trained models, output depths will not in metric space.")
 
-    download_model_if_doesnt_exist(args.model_name)
+    #download_model_if_doesnt_exist(args.model_name)
     model_path = os.path.join("models", args.model_name)
     print("-> Loading model from ", model_path)
     encoder_path = os.path.join(model_path, "encoder.pth")
@@ -141,7 +142,7 @@ def test_simple(args):
 
             frame_index += 1
 
-    video.close()
+    video.stop()
     print('-> Done!')
 
 

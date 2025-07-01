@@ -16,7 +16,6 @@ import matplotlib as mpl
 import matplotlib.cm as cm
 import cv2
 import time
-from imutils.video import VideoStream
 
 import torch
 from torchvision import transforms, datasets
@@ -42,6 +41,7 @@ def parse_args():
                             "mono+stereo_no_pt_640x192",
                             "mono_1024x320",
                             "stereo_1024x320",
+                            "baseline_mono_640x192",
                             "parallax_640x192",
                             "mono+stereo_1024x320"])
     parser.add_argument('--ext', type=str,
@@ -72,7 +72,7 @@ def test_simple(args):
         print("Warning: The --pred_metric_depth flag only makes sense for stereo-trained KITTI "
               "models. For mono-trained models, output depths will not in metric space.")
 
-    download_model_if_doesnt_exist(args.model_name)
+    #download_model_if_doesnt_exist(args.model_name)
     model_path = os.path.join("models", args.model_name)
     print("-> Loading model from ", model_path)
     encoder_path = os.path.join(model_path, "encoder.pth")
@@ -100,27 +100,36 @@ def test_simple(args):
 
     depth_decoder.to(device)
     depth_decoder.eval()
+    print('ENCODER')
+    print(encoder)
+    print('DECODER')
+    print(depth_decoder)
 
 
     # PREDICTING ON EACH IMAGE IN TURN
     with torch.no_grad():
         fps = 1
-        video = VideoStream(0).start()
+        video = cv2.VideoCapture()
+        video.open("/mnt/wksp/sfm/Videos/qubo/video_1718100136003.mp4")
         time_start = time.time()
-        #frame_index = 0
+        frame_index = 0
         alpha=0.1
+        aspect=3.33
         input_image2=None
         while True:
-            input_image1=pil.fromarray(video.read())
+            retval, orig_image = video.read()
+            h,w,c = orig_image.shape
+            crop_begin = int(h/2-w/aspect/2)
+            crop_end = int(h/2 + w/aspect/2)
+            orig_image = orig_image[crop_begin:crop_end,:]  #Crop the image to same aspect ratio as training image
+            orig_image = cv2.resize(orig_image, (640, 192))
+            input_image1=pil.fromarray(orig_image)
             original_width, original_height = input_image1.size
-            input_image1 = input_image1.resize((feed_width, feed_height), pil.LANCZOS).convert("RGB")
+            input_image1 = input_image1.resize((feed_width, feed_height), pil.LANCZOS)
             input_image1 = transforms.ToTensor()(input_image1).unsqueeze(0)
 
             if input_image2 == None:
-                input_image2=pil.fromarray(video.read())
-                original_width, original_height = input_image2.size
-                input_image2 = input_image2.resize((feed_width, feed_height), pil.LANCZOS).convert("RGB")
-                input_image2 = transforms.ToTensor()(input_image2).unsqueeze(0)
+                input_image2 = input_image1
 
             input_image = torch.cat((input_image1, input_image2), dim=1)
 
@@ -140,8 +149,8 @@ def test_simple(args):
             mapper = cm.ScalarMappable(norm=normalizer, cmap='magma')
             colormapped_im = (mapper.to_rgba(disp_resized_np)[:, :, :3] * 255).astype(np.uint8)
             im = pil.fromarray(colormapped_im)
-
             cv2.imshow("MONODEPTH2", colormapped_im)
+            cv2.imshow("Original", orig_image)
             if time.time()-time_start > 0:
                 fps = (1 - alpha) * fps + alpha * 1 / (time.time()-time_start)  # exponential moving average
                 time_start = time.time()
@@ -153,7 +162,6 @@ def test_simple(args):
 
             #frame_index += 1
 
-    video.stop()
     print('-> Done!')
 
 
