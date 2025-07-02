@@ -5,6 +5,9 @@
 # available in the LICENSE file.
 #
 # Run through a video file, and dump the depths and the pose for each frame
+# Normal inference does only depth estimation through depth encoder-decoder
+# We load the pose encoder-decoder pair that was used during training to
+# calculate the camera pose between frames and writes the pose matrix to disk.
 
 from __future__ import absolute_import, division, print_function
 

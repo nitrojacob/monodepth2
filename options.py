@@ -77,6 +77,9 @@ class MonodepthOptions:
         self.parser.add_argument("--use_stereo",
                                  help="if set, uses stereo pair for training",
                                  action="store_true")
+        self.parser.add_argument("--use_parallax",
+                                 help="if set, uses motion parallax for depth estimation",
+                                 action="store_true")
         self.parser.add_argument("--frame_ids",
                                  nargs="+",
                                  type=int,

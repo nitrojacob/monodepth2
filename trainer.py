@@ -50,8 +50,13 @@ class Trainer:
         if self.opt.use_stereo:
             self.opt.frame_ids.append("s")
 
-        self.models["encoder"] = networks.ResnetEncoder(
-            self.opt.num_layers, self.opt.weights_init == "pretrained", num_input_images=2) #Utilize motion parallax for depth estimation
+        if self.opt.use_parallax:
+            self.models["encoder"] = networks.ResnetEncoder(
+                self.opt.num_layers, self.opt.weights_init == "pretrained", num_input_images=2) #Utilize motion parallax for depth estimation
+        else:
+            self.models["encoder"] = networks.ResnetEncoder(
+                self.opt.num_layers, self.opt.weights_init == "pretrained", num_input_images=1)
+        
         self.models["encoder"].to(self.device)
         self.parameters_to_train += list(self.models["encoder"].parameters())
 
@@ -258,8 +263,11 @@ class Trainer:
             outputs = self.models["depth"](features[0])
         else:
             # Otherwise, we only feed the image with frame_id 0 through the depth encoder
-            all_color_aug = torch.cat([inputs[("color_aug", i, 0)] for i in [0, -1]], dim=1)   #Concatenate two adjacent frames into a six channel image to utilize motion parallax
-            features = self.models["encoder"](all_color_aug)
+            if self.opt.use_parallax:
+                all_color_aug = torch.cat([inputs[("color_aug", i, 0)] for i in [0, -1]], dim=1)   #Concatenate two adjacent frames into a six channel image to utilize motion parallax
+                features = self.models["encoder"](all_color_aug)
+            else:
+                features = self.models["encoder"](inputs["color_aug", 0, 0])
             outputs = self.models["depth"](features)
 
         if self.opt.predictive_mask:

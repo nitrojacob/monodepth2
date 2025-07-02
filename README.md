@@ -257,3 +257,14 @@ You can download our precomputed disparity predictions from the following links:
 Copyright © Niantic, Inc. 2019. Patent Pending.
 All rights reserved.
 Please see the [license file](LICENSE) for terms.
+
+
+## Additions to the repo
+The repo has been updated to a more recent python environment. Training scripts for kaggle.com are added. No other functional changes.
+
+Further, the depth-encoder has been modified to use two adjacent frames from a video to infer depth not only from lighting and the geometry, but also utilizing the movement of objects between frames.
+monodepth2-kaggle.ipynb can be used to train the parallax network in kaggle. At training time whether to use parallax can be configured using the --use_parallax option.
+
+At inference time, the test...paris.py files can be used for parallax inference. And the files without the 'pairs' for the models without parallax. If the wrong model is loaded to an inference script, a dimension mismatch error will occur.
+
+Further, the pose-encoder-decoder pair that was originally used only for training is now used during inference also in file dump_depth_pose_for_mononav.py to dump out the camera pose for integration with MonoNav project
